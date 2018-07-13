@@ -181,7 +181,7 @@
                                           :contacts/dapps default-dapps)}
                               (group-chat-messages)
                               (add-default-contacts)
-                              (commands/index-commands commands/register)))))
+                              (commands/load-commands commands/register)))))
 
 (defn- send-messages-seen [chat-id message-ids {:keys [db] :as cofx}]
   (when (and (not (get-in db [:chats chat-id :public?]))

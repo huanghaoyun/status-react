@@ -138,6 +138,11 @@
     [react/view
      (when dev-mode?
        [profile.components/settings-item
+        {:label-kw            :t/extensions
+         :action-fn           #(re-frame/dispatch [:navigate-to :extensions-settings])
+         :accessibility-label :extensions-button}])
+     (when dev-mode?
+       [profile.components/settings-item
         {:label-kw            :t/network
          :value               (get-in networks [network :name])
          :action-fn           #(re-frame/dispatch [:navigate-to :network-settings])

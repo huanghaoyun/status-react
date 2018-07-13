@@ -17,6 +17,7 @@
             status-im.ui.screens.network-settings.events
             status-im.ui.screens.profile.events
             status-im.ui.screens.qr-scanner.events
+            status-im.ui.screens.extensions.events
             status-im.ui.screens.wallet.events
             status-im.ui.screens.wallet.collectibles.events
             status-im.ui.screens.wallet.send.events

@@ -26,6 +26,6 @@
       (if (seq collectibles)
         [list/flat-list {:data      collectibles
                          :key-fn    (comp str :id)
-                         :render-fn #(render-collectible symbol %)}]
+                         :render-fn (render-collectible symbol %)}]
         [react/view {:style styles/loading-indicator}
          [react/activity-indicator {:animating true :size :large :color colors/blue}]])]]))

@@ -11,6 +11,7 @@
 (def public-chat-regex #".*/chat/public/(.*)$")
 (def profile-regex #".*/user/(.*)$")
 (def browse-regex #".*/browse/(.*)$")
+(def extension-regex #".*/extension/(.*)$")
 
 (defn match-url [url regex]
   (some->> url
@@ -40,6 +41,10 @@
 (defn handle-view-profile [profile-id cofx]
   (log/info "universal-links: handling view profile" profile-id)
   (chat.events/show-profile profile-id true cofx))
+
+(defn handle-extension [url cofx]
+  (log/info "universal-links: handling url profile" url)
+  {:extension/load-and-show url})
 
 (defn handle-not-found [full-url]
   (log/info "universal-links: no handler for " full-url))
@@ -79,6 +84,9 @@
 
     (match-url url browse-regex)
     (handle-browse url cofx)
+
+    (match-url url extension-regex)
+    (handle-extension url cofx)
 
     :else (handle-not-found url)))
 

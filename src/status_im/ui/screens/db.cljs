@@ -119,6 +119,8 @@
 
 (spec/def :navigation.screen-params/collectibles-list map?)
 
+(spec/def :navigation.screen-params/show-extension map?)
+
 (spec/def :navigation/screen-params (spec/nilable (allowed-keys :opt-un [:navigation.screen-params/network-details
                                                                          :navigation.screen-params/browser
                                                                          :navigation.screen-params/profile-qr-viewer
@@ -126,7 +128,8 @@
                                                                          :navigation.screen-params/group-contacts
                                                                          :navigation.screen-params/edit-contact-group
                                                                          :navigation.screen-params/dapp-description
-                                                                         :navigation.screen-params/collectibles-list])))
+                                                                         :navigation.screen-params/collectibles-list
+                                                                         :navigation.screen-params/show-extension])))
 
 (spec/def :desktop/desktop (spec/nilable any?))
 (spec/def ::tooltips (spec/nilable any?))
@@ -157,6 +160,8 @@
 ;;;;UNIVERSAL LINKS
 
 (spec/def :universal-links/url (spec/nilable string?))
+
+(spec/def ::extension (spec/nilable map?))
 
 ;; DIMENSIONS
 (spec/def :dimensions/window map?)
@@ -282,4 +287,5 @@
                  :notifications/notifications
                  ::device-UUID
                  ::collectible
-                 ::collectibles]))
+                 ::collectibles
+                 ::extension]))

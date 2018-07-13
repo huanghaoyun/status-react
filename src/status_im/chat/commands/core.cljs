@@ -1,5 +1,6 @@
 (ns status-im.chat.commands.core
-  (:require [clojure.set :as set]
+  (:require [re-frame.core :as re-frame]
+            [clojure.set :as set]
             [clojure.string :as string]
             [status-im.constants :as constants]
             [status-im.chat.constants :as chat-constants]
@@ -8,14 +9,18 @@
             [status-im.chat.models :as chat-model]
             [status-im.chat.models.input :as input-model]
             [status-im.chat.models.message :as message-model]
+            [status-im.extensions.registry :as registry]
+            [status-im.utils.handlers :as handlers]
             [status-im.utils.handlers-macro :as handlers-macro]))
 
 (def register
   "Register of all commands. Whenever implementing a new command,
   provide the implementation in the `status-im.chat.commands.impl.*` ns,
   and add its instance here."
-  #{(transactions/PersonalSendCommand.)
-    (transactions/PersonalRequestCommand.)})
+  (set/union
+   (registry/chat-commands)
+   #{(transactions/PersonalSendCommand.)
+     (transactions/PersonalRequestCommand.)}))
 
 (def command-id (juxt protocol/id protocol/scope))
 
@@ -80,7 +85,7 @@
 (defn index-commands
   "Takes collecton of things implementing the command protocol, and
   correctly indexes them  by their composite ids and access scopes."
-  [commands {:keys [db]}]
+  [commands]
   (let [id->command              (reduce (fn [acc command]
                                            (assoc acc (command-id command)
                                                   {:type   command
@@ -100,9 +105,23 @@
                                                         access-scopes)))
                                             {}
                                             id->command)]
-    {:db (assoc db
-                :id->command              id->command
-                :access-scope->command-id access-scope->command-id)}))
+    {:id->command              id->command
+     :access-scope->command-id access-scope->command-id}))
+
+(defn load-commands
+  "Takes collection of things implementing the command protocol and db,
+  correctly indexes them and adds them to db in a way that preserves existing commands"
+  [commands {:keys [db]}]
+  (let [{:keys [id->command access-scope->command-id]} (index-commands commands)]
+    {:db (-> db
+             (update :id->command merge id->command)
+             (update :access-scope->command-id #(merge-with (fnil into #{}) % access-scope->command-id)))}))
+
+(handlers/register-handler-fx
+ :load-commands
+ [re-frame/trim-v]
+ (fn [cofx [commands]]
+   (load-commands commands cofx)))
 
 (defn chat-commands
   "Takes `id->command`, `access-scope->command-id` and `chat` parameters and returns
