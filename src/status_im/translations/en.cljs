@@ -151,6 +151,7 @@
    :mainnet-text                         "You’re on the Mainnet. Real ETH will be sent"
    :dev-mode                             "Development mode"
    :backup-your-recovery-phrase          "Backup your recovery phrase"
+   :advanced-settings                    "Advanced settings"
 
    ;;recovery phrase
    :your-data-belongs-to-you             "If you lose your recovery phrase you lose your data and funds"
