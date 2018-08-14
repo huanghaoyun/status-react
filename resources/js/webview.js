@@ -24,6 +24,13 @@
                 host: window.location.hostname
             });
         }
+        else if (event.data.type === 'ETHEREUM_PROVIDER_REQUEST') {
+            bridgeSend({
+                type: 'status-api-request',
+                permissions: ['WEB3'],
+                host: window.location.hostname
+            });
+        }
     });
 
     WebViewBridge.onMessage = function (message) {
@@ -33,8 +40,17 @@
         if (data.type === "navigate-to-blank")
             window.location.href = "about:blank";
 
-        else if (data.type === "status-api-success")
-            window.STATUS_API = data.data;
-            window.postMessage({ type: 'STATUS_API_SUCCESS', permissions: data.keys }, "*");
+        else if (data.type === "status-api-success"){
+            if (data.keys == 'WEB3')
+            {
+                window.ethereum = new StatusHttpProvider("");
+                window.postMessage({ type: 'ETHEREUM_PROVIDER_SUCCESS' , id: 'STATUS'}, "*");
+            }
+            else
+            {
+                window.STATUS_API = data.data;
+                window.postMessage({ type: 'STATUS_API_SUCCESS', permissions: data.keys }, "*");
+            }
+        }
     };
 }());

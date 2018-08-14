@@ -3,14 +3,13 @@
             [status-im.utils.handlers :as handlers]
             [re-frame.core :as re-frame]
             [status-im.utils.random :as random]
-            [status-im.i18n :as i18n]
             [status-im.ui.components.list-selection :as list-selection]
             [status-im.utils.universal-links.core :as utils.universal-links]
             [status-im.data-store.browser :as browser-store]
             [status-im.utils.http :as http]
             [status-im.models.browser :as model]
             [status-im.utils.platform :as platform]
-            [status-im.utils.utils :as utils]
+            [status-im.utils.handlers-macro :as handlers-macro]
             [status-im.constants :as constants]))
 
 (re-frame/reg-fx
@@ -23,21 +22,10 @@
 (re-frame/reg-fx
  :send-to-bridge-fx
  (fn [[permissions-allowed webview]]
+   (println :send-to-bridge-fx permissions-allowed (keys permissions-allowed))
    (.sendToBridge @webview (.stringify js/JSON (clj->js {:type constants/status-api-success
                                                          :data permissions-allowed
                                                          :keys (keys permissions-allowed)})))))
-
-(re-frame/reg-fx
- :show-dapp-permission-confirmation-fx
- (fn [[permission {:keys [dapp-name permissions-data] :as params}]]
-   (utils/show-confirmation
-    {:ios-confirm-style "default"}
-    (str "\"" dapp-name "\" " (i18n/label :t/would-like-to-access) " " (:label (get model/permissions permission)))
-    (i18n/label :t/make-sure-you-trust-dapp)
-    nil
-    #(re-frame/dispatch [:next-dapp-permission params permission permissions-data])
-    #(re-frame/dispatch [:next-dapp-permission params])
-    (i18n/label :t/dont-allow))))
 
 (handlers/register-handler-fx
  :initialize-browsers
@@ -118,18 +106,32 @@
      (and (= type constants/history-state-changed) platform/ios? (not= "about:blank" url))
      (model/update-browser-history-fx cofx browser url false)
 
-     (= type constants/status-api-request)
-     (let [{:account/keys [account]} db
-           {:keys [dapp? name]} browser
+     (or (= type constants/status-api-request)
+         (= type constants/status-web3-request))
+     (let [{:keys [dapp? name]} browser
            dapp-name (if dapp? name host)]
-       (model/request-permission
-        cofx
-        {:dapp-name             dapp-name
-         :webview               webview
-         :index                 0
-         :user-permissions      (get-in db [:dapps/permissions dapp-name :permissions])
-         :requested-permissions permissions
-         :permissions-data      {constants/dapp-permission-contact-code (:public-key account)}})))))
+       {:db       (update-in db [:browser/options :permissions-queue] conj {:dapp-name   dapp-name
+                                                                            :permissions permissions})
+        ;; TODO (andrey) remove webview later when wallet refactoring will be merged
+        :dispatch [:check-permissions-queue webview]}))))
+
+(handlers/register-handler-fx
+ :check-permissions-queue
+ [re-frame/trim-v]
+ (fn [{:keys [db] :as cofx} [webview]]
+   (let [{:keys [show-permission permissions-queue]} (:browser/options db)]
+     (when (and (nil? show-permission) (last permissions-queue))
+       (let [{:keys [dapp-name permissions]} (last permissions-queue)
+             {:account/keys [account]} db]
+         (handlers-macro/merge-fx cofx
+                                  {:db (update-in db [:browser/options :permissions-queue] drop-last)}
+                                  (model/request-permission
+                                   {:dapp-name             dapp-name
+                                    :webview               webview
+                                    :index                 0
+                                    :user-permissions      (get-in db [:dapps/permissions dapp-name :permissions])
+                                    :requested-permissions permissions
+                                    :permissions-data      {constants/dapp-permission-contact-code (:public-key account)}})))))))
 
 (handlers/register-handler-fx
  :next-dapp-permission

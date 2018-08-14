@@ -17,8 +17,8 @@
   (< history-index (dec (count history))))
 
 (defn check-if-dapp-in-list [{:keys [history history-index] :as browser}]
-  (let [history-host  (http/url-host (try (nth history history-index) (catch js/Error _)))
-        dapp (first (filter #(= history-host (http/url-host (:dapp-url %))) (apply concat (mapv :data default-dapps/all))))]
+  (let [history-host (http/url-host (try (nth history history-index) (catch js/Error _)))
+        dapp         (first (filter #(= history-host (http/url-host (:dapp-url %))) (apply concat (mapv :data default-dapps/all))))]
     (if dapp
       (assoc browser :dapp? true :name (:name dapp))
       (assoc browser :dapp? false :name (i18n/label :t/browser)))))
@@ -49,16 +49,23 @@
   (merge (update-browser-fx cofx browser)
          {:dispatch [:navigate-to :browser (:browser-id browser)]}))
 
-(def permissions {constants/dapp-permission-contact-code {:label (i18n/label :t/your-contact-code)}})
+(def permissions {constants/dapp-permission-contact-code {:title       (i18n/label :t/wants-to-access-profile)
+                                                          :description (i18n/label :t/your-contact-code)
+                                                          :icon        :icons/profile-active}
+                  constants/dapp-permission-web3         {:title       (i18n/label :t/dapp-would-like-to-connect-wallet)
+                                                          :description (i18n/label :t/allowing-authorizes-this-dapp)
+                                                          :icon        :icons/wallet-active}})
 
 (defn update-dapp-permissions-fx [{:keys [db]} permissions]
-  {:db            (assoc-in db [:dapps/permissions (:dapp permissions)] permissions)
+  {:db            (-> db
+                      (assoc-in [:browser/options :show-permission] nil)
+                      (assoc-in [:dapps/permissions (:dapp permissions)] permissions))
    :data-store/tx [(dapp-permissions/save-dapp-permissions permissions)]})
 
-(defn request-permission [cofx
-                          {:keys [dapp-name index requested-permissions permissions-allowed user-permissions
+(defn request-permission [{:keys [dapp-name index requested-permissions permissions-allowed user-permissions
                                   permissions-data webview]
-                           :as   params}]
+                           :as   params}
+                          {:keys [db] :as cofx}]
   ;; iterate all requested permissions
   (if (< index (count requested-permissions))
     (let [requested-permission (get requested-permissions index)]
@@ -67,19 +74,21 @@
         ;; if permission already allowed go to next, if not, show confirmation dialog
         (if ((set user-permissions) requested-permission)
           {:dispatch [:next-dapp-permission params requested-permission permissions-data]}
-          {:show-dapp-permission-confirmation-fx [requested-permission params]})
+          {:db (assoc-in db [:browser/options :show-permission] {:requested-permission requested-permission
+                                                                 :params               params})})
         {:dispatch [:next-dapp-permission params]}))
     (assoc (update-dapp-permissions-fx cofx {:dapp        dapp-name
                                              :permissions (vec (set (concat (keys permissions-allowed)
                                                                             user-permissions)))})
-           :send-to-bridge-fx [permissions-allowed webview])))
+           :send-to-bridge-fx [permissions-allowed webview]
+           :dispatch [:check-permissions-queue webview])))
 
 (defn next-permission [cofx params & [permission permissions-data]]
   (request-permission
-   cofx
    (cond-> params
      true
      (update :index inc)
 
      (and permission permissions-data)
-     (assoc-in [:permissions-allowed permission] (get permissions-data permission)))))
+     (assoc-in [:permissions-allowed permission] (get permissions-data permission)))
+   cofx))
