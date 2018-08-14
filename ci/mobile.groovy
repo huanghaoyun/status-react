@@ -74,7 +74,7 @@ def compileiOS() {
   ]) {
     sh "plutil -replace CFBundleShortVersionString  -string ${version} ios/StatusIm/Info.plist"
     sh "plutil -replace CFBundleVersion -string ${build_no} ios/StatusIm/Info.plist"
-    sh 'fastlane ios nightly'
+    sh 'bundle exec fastlane ios nightly'
   }
 }
 
