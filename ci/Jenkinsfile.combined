@@ -27,7 +27,8 @@ pipeline {
           checkout scm
           mobile = load 'ci/mobile.groovy'
           desktop = load 'ci/desktop.groovy'
-          mobile.tagBuild()
+          //build_no = mobile.tagBuild()
+          build_no = 1234
         }
       }
     }
@@ -86,7 +87,7 @@ pipeline {
     stage('Notify') {
       steps {
         slackSend(
-          message: "Nightly build success! (develop)"
+          message: "Nightly build success! (develop)",
           color: 'good'
         )
       }

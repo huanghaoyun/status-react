@@ -1,14 +1,4 @@
-def installJSDeps() {
-    def attempt = 1
-    def maxAttempts = 10
-    def installed = false
-    while (!installed && attempt <= maxAttempts) {
-        println "#${attempt} attempt to install npm deps"
-        sh 'npm install'
-        installed = fileExists('node_modules/web3/index.js')
-        attemp = attempt + 1
-    }
-}
+common = load 'ci/common.groovy'
 
 def uploadArtifact() {
   def artifact_dir = pwd() + '/android/app/build/outputs/apk/release/'
@@ -34,11 +24,9 @@ def prepDeps() {
   /* prepare environment for specific platform build */
   sh 'scripts/prepare-for-platform.sh mobile'
   version = readFile("${env.WORKSPACE}/VERSION").trim()
-  installJSDeps()
+  common.installJSDeps()
   sh 'mvn -f modules/react-native-status/ios/RCTStatus dependency:unpack'
-  dir('ios') {
-    sh 'pod install'
-  }
+  // TODO sh 'cd ios && pod install'
 }
 
 def compileAndroid() {
@@ -47,20 +35,6 @@ def compileAndroid() {
     string(credentialsId: "SLACK_URL", variable: 'SLACK_URL')
   ]) {
     sh ('bundle exec fastlane android nightly')
-  }
-}
-
-def tagBuild() {
-  withCredentials([[
-    $class: 'UsernamePasswordMultiBinding',
-    credentialsId: 'status-im-auto',
-    usernameVariable: 'GIT_USER',
-    passwordVariable: 'GIT_PASS'
-  ]]) {
-    build_no = sh(
-      returnStdout: true,
-      script: './scripts/build_no.sh --increment'
-    ).trim()
   }
 }
 
@@ -73,23 +47,21 @@ def leinBuild() {
 }
 
 def buildAndroid() {
-  stage('Build (Android)') {
-    dir('android') {
-      sh './gradlew react-native-android:installArchives'
-      sh './gradlew assembleRelease'
-    }
+  dir('android') {
+    sh './gradlew react-native-android:installArchives'
+    sh './gradlew assembleRelease'
   }
 
-  stage('Build (Android) for e2e tests') {
-    dir('android') {
-      sh """
-        mv app/build/outputs/apk/release/app-release.apk \\
-           app/build/outputs/apk/release/app-release.original.apk
-      """
-      env.ENVFILE=".env.e2e"
-      sh './gradlew assembleRelease'
-    }
-  }
+  //stage('Build (Android) for e2e tests') {
+  //  dir('android') {
+  //    sh """
+  //      mv app/build/outputs/apk/release/app-release.apk \\
+  //         app/build/outputs/apk/release/app-release.original.apk
+  //    """
+  //    env.ENVFILE=".env.e2e"
+  //    sh './gradlew assembleRelease'
+  //  }
+  //}
 }
 
 def compileiOS() {

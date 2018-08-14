@@ -1,3 +1,5 @@
+common = load 'ci/common.groovy'
+
 commit = ''
 qtBin = '/opt/qt59/bin'
 packageFolder = './StatusImPackage'
@@ -12,35 +14,11 @@ external_modules_dir = [
   'modules/react-native-status/desktop',
 ]
 
-def installJSDeps() {
-  def attempt = 1
-  def maxAttempts = 10
-  def installed = false
-  sh 'node -v'
-  sh 'npm -v'
-  while (!installed && attempt <= maxAttempts) {
-    println "#${attempt} attempt to install npm deps"
-    sh 'scripts/prepare-for-platform.sh desktop'
-    sh 'npm install'
-    installed = fileExists('node_modules/web3/index.js')
-    attemp = attempt + 1
-  }
-}
-
-def doGitRebase() {
-  try {
-    sh 'git rebase origin/develop'
-  } catch (e) {
-    sh 'git rebase --abort'
-    throw e
-  }
-}
-
 def cleanupBuild() {
   sh """
     rm -rf \\
       node_modules ${packageFolder} \\
-      desktop/modules desktop/node_modules"
+      desktop/modules desktop/node_modules
   """
 }
 
@@ -48,7 +26,7 @@ def cleanupAndDeps() {
   cleanupBuild()
   sh 'cp .env.jenkins .env'
   sh 'lein deps'
-  installJSDeps()
+  common.installJSDeps()
 }
 
 def slackNotify(message, color = 'good') {
@@ -98,7 +76,7 @@ def uploadArtifact(filename) {
 /* MAIN --------------------------------------------------*/
 
 def prepDeps() {
-  doGitRebase()
+  common.doGitRebase()
   cleanupAndDeps()
   commit = sh(
     returnStdout: true,
