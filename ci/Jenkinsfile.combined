@@ -59,7 +59,11 @@ pipeline {
           agent { label 'macos' }
           steps {
             script {
-              def dmg_file = desktop.desktopMacOSBuild()
+              desktop.prepDeps()
+              desktop.buildClojureScript()
+              desktop.compileMacOS()
+              def dmg_file = desktop.bundleMacOS()
+              archiveArtifacts "StatusImPackage/${dmg_file}"
             }
           }
         }
@@ -67,7 +71,11 @@ pipeline {
           agent { label 'linux-new'  }
           steps {
             script {
-              def app_file = desktop.desktopLinuxBuild()
+              desktop.prepDeps()
+              desktop.buildClojureScript()
+              desktop.compileLinux()
+              def app_file = desktop.bundleLinux()
+              archiveArtifacts "StatusImPackage/${app_file}"
             }
           }
         }

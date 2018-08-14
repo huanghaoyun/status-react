@@ -1,4 +1,5 @@
 commit = ''
+qtBin = '/opt/qt59/bin'
 packageFolder = './StatusImPackage'
 external_modules_dir = [
   'node_modules/react-native-i18n/desktop',
@@ -36,10 +37,11 @@ def doGitRebase() {
 }
 
 def cleanupBuild() {
-  sh 'rm -rf node_modules'
-  sh "rm -rf ${packageFolder}"
-  sh 'rm -rf desktop/modules'
-  sh 'rm -rf desktop/node_modules'
+  sh """
+    rm -rf \\
+      node_modules ${packageFolder} \\
+      desktop/modules desktop/node_modules"
+  """
 }
 
 def cleanupAndDeps() {
@@ -95,147 +97,115 @@ def uploadArtifact(filename) {
 
 /* MAIN --------------------------------------------------*/
 
-def desktopLinuxBuild() {
-  def app_file = ''
-  def qt_bin = '/opt/qt59/bin'
-
-  stage('Git & Deps') {
-    doGitRebase()
-    cleanupAndDeps()
-    commit = sh(
-      returnStdout: true,
-      script: 'git rev-parse HEAD'
-    ).trim().take(6)
-  }
+def prepDeps() {
+  doGitRebase()
+  cleanupAndDeps()
+  commit = sh(
+    returnStdout: true,
+    script: 'git rev-parse HEAD'
+  ).trim().take(6)
+}
   
-  stage('Build ClojureScript') {
-    buildClojureScript()
-  }
-  
-  stage('Build Linux binaries') {
-    /* add path for QT installation binaries */
-    env.PATH = "${qt_bin}:${env.PATH}"
-    dir('desktop') {
-      sh 'rm -rf CMakeFiles CMakeCache.txt cmake_install.cmake Makefile'
-      sh """
-        cmake -Wno-dev \\
-          -DCMAKE_BUILD_TYPE=Release \\
-          -DEXTERNAL_MODULES_DIR='${external_modules_dir.join(";")}' \\
-          -DJS_BUNDLE_PATH='${workspace}/${packageFolder}/StatusIm.jsbundle' \\
-          -DCMAKE_CXX_FLAGS:='-DBUILD_FOR_BUNDLE=1'
-      """
-      sh 'make'
-    }
-  }
-  
-  stage('Create Linux AppImage') {
-    dir(packageFolder) {
-      sh 'rm -rf StatusImAppImage'
-      /* TODO this needs to be fixed: status-react/issues/5378 */
-      sh 'cp /opt/StatusImAppImage.zip ./'
-      sh 'unzip ./StatusImAppImage.zip'
-      sh 'rm -rf AppDir'
-      sh 'mkdir AppDir'
-    }
-    sh "cp -r ./deployment/linux/usr  ${packageFolder}/AppDir"
-    sh "cp ./deployment/linux/.env  ${packageFolder}/AppDir"
-    sh "cp ./desktop/bin/StatusIm ${packageFolder}/AppDir/usr/bin"
-    sh 'wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage'
-    sh 'chmod a+x ./linuxdeployqt-continuous-x86_64.AppImage'
-  
-    sh 'rm -f Application-x86_64.AppImage'
-    sh 'rm -f StatusIm-x86_64.AppImage'
-  
-    sh "ldd ${packageFolder}/AppDir/usr/bin/StatusIm"
+def compileLinux() {
+  /* add path for QT installation binaries */
+  env.PATH = "${qtBin}:${env.PATH}"
+  dir('desktop') {
+    sh 'rm -rf CMakeFiles CMakeCache.txt cmake_install.cmake Makefile'
     sh """
-      ./linuxdeployqt-continuous-x86_64.AppImage \\
-        ${packageFolder}/AppDir/usr/share/applications/StatusIm.desktop \\
-        -verbose=3 -always-overwrite -no-strip \\
-        -no-translations -bundle-non-qt-libs \\
-        -qmake=${qt_bin}/qmake \\
-        -extra-plugins=imageformats/libqsvg.so \\
-        -qmldir='${workspace}/node_modules/react-native'
+      cmake -Wno-dev \\
+        -DCMAKE_BUILD_TYPE=Release \\
+        -DEXTERNAL_MODULES_DIR='${external_modules_dir.join(";")}' \\
+        -DJS_BUNDLE_PATH='${workspace}/${packageFolder}/StatusIm.jsbundle' \\
+        -DCMAKE_CXX_FLAGS:='-DBUILD_FOR_BUNDLE=1'
     """
-    dir(packageFolder) {
-      sh 'ldd AppDir/usr/bin/StatusIm'
-      sh 'cp -r assets/share/assets AppDir/usr/bin'
-      sh 'cp -rf StatusImAppImage/* AppDir/usr/bin'
-      sh 'rm -f AppDir/usr/bin/StatusIm.AppImage'
-    }
-    sh """
-      ./linuxdeployqt-continuous-x86_64.AppImage \\
+    sh 'make'
+  }
+}
+  
+def bundleLinux() {
+  def appFile
+
+  dir(packageFolder) {
+    sh 'rm -rf StatusImAppImage'
+    /* TODO this needs to be fixed: status-react/issues/5378 */
+    sh 'cp /opt/StatusImAppImage.zip ./'
+    sh 'unzip ./StatusImAppImage.zip'
+    sh 'rm -rf AppDir'
+    sh 'mkdir AppDir'
+  }
+  sh "cp -r ./deployment/linux/usr  ${packageFolder}/AppDir"
+  sh "cp ./deployment/linux/.env  ${packageFolder}/AppDir"
+  sh "cp ./desktop/bin/StatusIm ${packageFolder}/AppDir/usr/bin"
+  sh 'wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage'
+  sh 'chmod a+x ./linuxdeployqt-continuous-x86_64.AppImage'
+
+  sh 'rm -f Application-x86_64.AppImage'
+  sh 'rm -f StatusIm-x86_64.AppImage'
+
+  sh "ldd ${packageFolder}/AppDir/usr/bin/StatusIm"
+  sh """
+    ./linuxdeployqt-continuous-x86_64.AppImage \\
       ${packageFolder}/AppDir/usr/share/applications/StatusIm.desktop \\
-      -verbose=3 -appimage -qmake=${qt_bin}/qmake
-    """
-    dir(packageFolder) {
-      sh 'ldd AppDir/usr/bin/StatusIm'
-      sh 'rm -rf StatusIm.AppImage'
-      app_file = "StatusIm-${commit}.AppImage"
-      sh "mv ../StatusIm-x86_64.AppImage ${app_file}"
-    }
+      -verbose=3 -always-overwrite -no-strip \\
+      -no-translations -bundle-non-qt-libs \\
+      -qmake=${qtBin}/qmake \\
+      -extra-plugins=imageformats/libqsvg.so \\
+      -qmldir='${workspace}/node_modules/react-native'
+  """
+  dir(packageFolder) {
+    sh 'ldd AppDir/usr/bin/StatusIm'
+    sh 'cp -r assets/share/assets AppDir/usr/bin'
+    sh 'cp -rf StatusImAppImage/* AppDir/usr/bin'
+    sh 'rm -f AppDir/usr/bin/StatusIm.AppImage'
   }
-  
-  stage('Archive Artifacts') {
-    archiveArtifacts "StatusImPackage/${app_file}"
+  sh """
+    ./linuxdeployqt-continuous-x86_64.AppImage \\
+    ${packageFolder}/AppDir/usr/share/applications/StatusIm.desktop \\
+    -verbose=3 -appimage -qmake=${qtBin}/qmake
+  """
+  dir(packageFolder) {
+    sh 'ldd AppDir/usr/bin/StatusIm'
+    sh 'rm -rf StatusIm.AppImage'
+    appFile = "StatusIm-${commit}.AppImage"
+    sh "mv ../StatusIm-x86_64.AppImage ${appFile}"
   }
 
-  return app_file
+  return appFile
 }
 
-def desktopMacOSBuild() {
-  def dmg_file = ''
-
-  stage('Git & Deps') {
-    doGitRebase()
-    cleanupAndDeps()
-    commit = sh(
-      returnStdout: true,
-      script: 'git rev-parse HEAD'
-    ).trim().take(6)
+def compileMacOS() {
+  /* add path for QT installation binaries */
+  env.PATH = "/Users/administrator/qt/5.9.1/clang_64/bin:${env.PATH}"
+  dir('desktop') {
+    sh 'rm -rf CMakeFiles CMakeCache.txt cmake_install.cmake Makefile'
+    sh """
+      cmake -Wno-dev \\
+        -DCMAKE_BUILD_TYPE=Release \\
+        -DEXTERNAL_MODULES_DIR='${external_modules_dir.join(";")}' \\
+        -DJS_BUNDLE_PATH='${workspace}/${packageFolder}/StatusIm.jsbundle' \\
+        -DCMAKE_CXX_FLAGS:='-DBUILD_FOR_BUNDLE=1'
+    """
+    sh 'make'
   }
+}
 
-  stage('Build ClojureScript') {
-    buildClojureScript()
+def bundleMacOS() {
+  def dmgFile
+  dir(packageFolder) {
+    sh 'git clone https://github.com/vkjr/StatusAppFiles.git'
+    sh 'unzip StatusAppFiles/StatusIm.app.zip'
+    sh 'cp -r assets/share/assets StatusIm.app/Contents/MacOs'
+    sh 'chmod +x StatusIm.app/Contents/MacOs/ubuntu-server'
+    sh 'cp ../desktop/bin/StatusIm StatusIm.app/Contents/MacOs'
+    sh """
+      macdeployqt StatusIm.app -verbose=1 -dmg \\
+        -qmldir='${workspace}/node_modules/react-native/ReactQt/runtime/src/qml/'
+    """
+    sh 'rm -fr StatusAppFiles'
+    dmgFile = "StatusIm-${commit}.dmg"
+    sh "mv StatusIm.dmg ${dmgFile}"
   }
-
-  stage('Build MacOS binaries') {
-    /* add path for QT installation binaries */
-    env.PATH = "/Users/administrator/qt/5.9.1/clang_64/bin:${env.PATH}"
-    dir('desktop') {
-      sh 'rm -rf CMakeFiles CMakeCache.txt cmake_install.cmake Makefile'
-      sh """
-        cmake -Wno-dev \\
-          -DCMAKE_BUILD_TYPE=Release \\
-          -DEXTERNAL_MODULES_DIR='${external_modules_dir.join(";")}' \\
-          -DJS_BUNDLE_PATH='${workspace}/${packageFolder}/StatusIm.jsbundle' \\
-          -DCMAKE_CXX_FLAGS:='-DBUILD_FOR_BUNDLE=1'
-      """
-      sh 'make'
-    }
-  }
-
-  stage('Create MacOS Bundle') {
-    dir(packageFolder) {
-      sh 'git clone https://github.com/vkjr/StatusAppFiles.git'
-      sh 'unzip StatusAppFiles/StatusIm.app.zip'
-      sh 'cp -r assets/share/assets StatusIm.app/Contents/MacOs'
-      sh 'chmod +x StatusIm.app/Contents/MacOs/ubuntu-server'
-      sh 'cp ../desktop/bin/StatusIm StatusIm.app/Contents/MacOs'
-      sh """
-        macdeployqt StatusIm.app -verbose=1 -dmg \\
-          -qmldir='${workspace}/node_modules/react-native/ReactQt/runtime/src/qml/'
-      """
-      sh 'rm -fr StatusAppFiles'
-      dmg_file = "StatusIm-${commit}.dmg"
-      sh "mv StatusIm.dmg ${dmg_file}"
-    }
-  }
-
-  stage('Archive Artifact') {
-    archiveArtifacts "StatusImPackage/${dmg_file}"
-  }
-
-  return dmg_file
+  return dmgFile
 }
 
 return this
