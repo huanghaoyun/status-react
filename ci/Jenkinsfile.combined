@@ -2,6 +2,7 @@ pipeline {
   agent { label 'master' }
 
   options {
+    disableConcurrentBuilds()
     buildDiscarder(logRotator(
       numToKeepStr: '10',
       daysToKeepStr: '30',
