@@ -83,18 +83,15 @@ pipeline {
       }
     }
   
-    //stage('Slack Notification') {
-    //  slackSend(
-    //    message: (
-    //      "Nightly build (develop)\n" +
-    //      "Android: ${apkUrl}\n" +
-    //      "iOS: ${ipaUrl}\n" +
-    //      "Android for e2e: ${testApkUrl}"
-    //    ),
-    //    color: 'good'
-    //  )
-    //}
-    //
+    stage('Notify') {
+      steps {
+        slackSend(
+          message: "Nightly build success! (develop)"
+          color: 'good'
+        )
+      }
+    }
+
     //stage('Run extended e2e tests') {
     //  build(
     //    job: 'end-to-end-tests/status-app-nightly',
