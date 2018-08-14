@@ -114,7 +114,6 @@ RCT_EXPORT_METHOD(startNode:(NSString *)configString) {
     NSString *upstreamURL = [configJSON valueForKeyPath:@"UpstreamConfig.URL"];
     NSArray *bootnodes = [configJSON valueForKeyPath:@"ClusterConfig.BootNodes"];
     NSString *networkDir = [rootUrl.path stringByAppendingString:dataDir];
-    NSString *devCluster = [ReactNativeConfig envFor:@"ETHEREUM_DEV_CLUSTER"];
     NSString *logLevel = [[ReactNativeConfig envFor:@"LOG_LEVEL_STATUS_GO"] uppercaseString];
     char *configChars = GenerateConfig((char *)[networkDir UTF8String], networkId);
     NSString *config = [NSString stringWithUTF8String: configChars];
@@ -139,6 +138,10 @@ RCT_EXPORT_METHOD(startNode:(NSString *)configString) {
         [resultingConfigJson setValue:bootnodes forKeyPath:@"ClusterConfig.BootNodes"];
     }
 
+    NSString *fleet = [ReactNativeConfig envFor:@"FLEET"];
+    if([fleet length] > 0) {
+        [resultingConfigJson setValue:fleet forKeyPath:@"ClusterConfig.Fleet"];
+    }
 
     NSString *resultingConfig = [resultingConfigJson bv_jsonStringWithPrettyPrint:NO];
     NSLog(@"node config %@", resultingConfig);

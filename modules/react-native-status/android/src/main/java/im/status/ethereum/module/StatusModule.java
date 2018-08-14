@@ -42,15 +42,17 @@ class StatusModule extends ReactContextBaseJavaModule implements LifecycleEventL
     private ExecutorService executor = null;
     private boolean debug;
     private boolean devCluster;
+    private String fleet;
     private String logLevel;
 
-    StatusModule(ReactApplicationContext reactContext, boolean debug, boolean devCluster, String logLevel) {
+    StatusModule(ReactApplicationContext reactContext, boolean debug, boolean devCluster, String fleet, String logLevel) {
         super(reactContext);
         if (executor == null) {
             executor = Executors.newCachedThreadPool();
         }
         this.debug = debug;
         this.devCluster = devCluster;
+        this.fleet = fleet;
         this.logLevel = logLevel;
         reactContext.addLifecycleEventListener(this);
     }
@@ -245,6 +247,7 @@ class StatusModule extends ReactContextBaseJavaModule implements LifecycleEventL
                 Object clusterConfig = customConfig.get("ClusterConfig");
                 if (clusterConfig != null) {
                     Log.d(TAG, "ClusterConfig is not null");
+                    clusterConfig.put("Fleet", fleet);
                     jsonConfig.put("ClusterConfig", clusterConfig);
                 }
             } catch (Exception e) {
