@@ -35,7 +35,9 @@ def compileAndroid() {
     string(credentialsId: "SLACK_URL", variable: 'SLACK_URL')
   ]) {
     sh 'env'
-    sh 'fastlane android nightly'
+    sh 'ls -l /usr/local/bin/fastlane'
+    sh 'hostname'
+    sh 'env && fastlane android nightly'
   }
 }
 
