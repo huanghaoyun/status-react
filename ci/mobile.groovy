@@ -34,7 +34,8 @@ def compileAndroid() {
     string(credentialsId: "SUPPLY_JSON_KEY_DATA", variable: 'GOOGLE_PLAY_JSON_KEY'),
     string(credentialsId: "SLACK_URL", variable: 'SLACK_URL')
   ]) {
-    sh ('bundle exec fastlane android nightly')
+    sh 'env'
+    sh 'fastlane android nightly'
   }
 }
 
@@ -74,7 +75,8 @@ def compileiOS() {
   ]) {
     sh "plutil -replace CFBundleShortVersionString  -string ${version} ios/StatusIm/Info.plist"
     sh "plutil -replace CFBundleVersion -string ${build_no} ios/StatusIm/Info.plist"
-    sh 'bundle exec fastlane ios nightly'
+    sh 'env'
+    sh 'fastlane ios nightly'
   }
 }
 
