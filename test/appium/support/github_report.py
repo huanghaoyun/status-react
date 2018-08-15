@@ -70,15 +70,17 @@ class GithubHtmlReport(BaseTestReport):
             html += "<code>%s</code>" % last_testrun.error
             html += "<br/><br/>"
         if last_testrun.jobs:
-            html += self.build_device_sessions_html(last_testrun.jobs)
+            html += self.build_device_sessions_html(last_testrun.jobs, last_testrun)
         html += "</td></tr>"
         return html
 
-    def build_device_sessions_html(self, jobs):
+    def build_device_sessions_html(self, jobs, test_run):
         html = "<ins>Device sessions:</ins>"
         html += "<p><ul>"
-        for i, job_id in enumerate(jobs):
-            html += "<li><a href=\"%s\">Device %d</a></li>" % (self.get_sauce_job_url(job_id), i+1)
+        for job_id, i in jobs.items():
+            html += "<li><a href=\"%s\">Device %d</a></li>" % (self.get_sauce_job_url(job_id), i)
+            if test_run.error:
+                html += "<img width='300' src='%s'>" % self.get_sauce_final_screenshot_url(job_id)
         html += "</ul></p>"
         return html
 
