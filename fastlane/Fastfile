@@ -22,6 +22,33 @@ def unlock_keychain_if_needed
 end
 
 
+# uploads `file` to sauce labs (overwrites if there is anoter file from the
+# same commit)
+def upload_to_saucelabs(file)
+    username = ENV["SAUCE_USERNAME"]
+    key = ENV["SAUCE_ACCESS_KEY"]
+    unique_name = ENV["SAUCE_LABS_APK"]
+
+    url = "https://saucelabs.com/rest/v1/storage/" + username + '/' + unique_name + "?overwrite=true"
+
+    upload_result = sh(
+        "curl",
+        "-u", username + ':' + key,
+        "-X", "POST", 
+        "-H", "Content-Type: application/octet-stream",
+        url,
+        # this command has `status-react/fastlane` as cwd
+        # so we need to jump outside this folder to get a file
+        "--data-binary", "@" + "../" + file
+    )
+
+    # fail the lane if upload fails
+    UI.user_error!(
+        "failed to upload file to saucelabs: " + upload_result
+    ) unless upload_result.include? "filename"
+end
+
+
 # builds an ios app with ad-hoc configuration and put it 
 # to "status-adhoc" output folder
 def build_ios_adhoc
@@ -31,6 +58,9 @@ def build_ios_adhoc
         readonly: true,
         keychain_name: "login.keychain"
     )
+
+    workaround_realm_core_sync_issues
+
     build_ios_app(
         scheme: "StatusIm",
         workspace: "ios/StatusIm.xcworkspace",
@@ -43,8 +73,10 @@ end
 
 
 def notify_about_new_build(source, url)
+    branch_name = ENV["BRANCH_NAME"]
+    branch_name = "develop" if branch_name.nil?
 
-    msg = "Branch: " + ENV["BRANCH_NAME"] + ", "
+    msg = "Branch: " + branch_name + ", "
 
     if source.end_with? ".ipa"
         msg = msg + "iOS build uploaded to diawi: " + url
@@ -57,15 +89,21 @@ def notify_about_new_build(source, url)
         slack_url: ENV["SLACK_URL"]
     )
 
-    github_api(
-        server_url: "https://api.github.com",
-        api_token: ENV["GITHUB_TOKEN"],
-        http_method: "POST",
-        path: "/repos/status-im/status-react/issues/" + ENV["CHANGE_ID"] + "/comments",
-        body: {
-           "body": msg
-        }
-    )
+    change_id = ENV["CHANGE_ID"]
+
+    unless change_id.nil?
+
+        github_api(
+            server_url: "https://api.github.com",
+            api_token: ENV["GITHUB_TOKEN"],
+            http_method: "POST",
+            path: "/repos/status-im/status-react/issues/" + change_id + "/comments",
+            body: {
+               "body": msg
+            }
+        )
+
+    end
 
 end
 
@@ -76,12 +114,13 @@ def upload_to_diawi_and_notify(source)
         file: source
     )
 
+    File.write("diawi.out", lane_context[SharedValues::UPLOADED_FILE_LINK_TO_DIAWI])
+
     notify_about_new_build(
         source,
         lane_context[SharedValues::UPLOADED_FILE_LINK_TO_DIAWI]
     )
 end
-
 
 platform :ios do
   desc "`fastlane ios adhoc` - ad-hoc lane for iOS."
@@ -105,6 +144,9 @@ platform :ios do
         readonly: true,
         keychain_name: "login.keychain"
     )
+
+    workaround_realm_core_sync_issues
+
     build_ios_app(
         scheme: "StatusIm",
         workspace: "ios/StatusIm.xcworkspace",
@@ -135,6 +177,9 @@ platform :ios do
         readonly: true,
         keychain_name: "login.keychain"
     )
+
+    workaround_realm_core_sync_issues
+
     build_ios_app(
         scheme: "StatusIm",
         workspace: "ios/StatusIm.xcworkspace",
@@ -171,11 +216,28 @@ platform :ios do
   desc "expects to have a github token as GITHUB_TOKEN env variable"
   desc "expects to have a slack webhook URL as SLACK_URL env variable"
   desc "will fails if file isn't there"
+  desc "---"
+  desc "Output: writes `fastlane/diawi.out` file url of the uploded file"
   lane :upload_diawi do
     upload_to_diawi_and_notify(
         "status-adhoc/StatusIm.ipa"
     )
   end
+
+
+  desc "This fastlane step is a workaround!"
+  desc "every now and then Realm fails on iOS on the 'Download Core` step"
+  desc "the issue is because multiple downloads use the same temp dir"
+  desc "now we are replacing the original download script with another"
+  desc "that generates a random folder for each run"
+  lane :workaround_realm_core_sync_issues do
+      FileUtils.cp_r(
+          '../ci/download-realm.js',
+          '../node_modules/realm/scripts',
+          remove_destination: true
+      )    
+  end
+
 end
 
 
@@ -208,15 +270,30 @@ platform :android do
     )
   end
 
-  desc "`fastlane android upload-diawi` - upload .ipa to diawi"
+  desc "`fastlane android upload_diawi` - upload .apk to diawi"
   desc "also notifies in a GitHub comments and in Slack #jenkins channel"
   desc "expects to have an .apk prepared: `android/app/build/outputs/apk/release/app-release.apk`"
   desc "expects to have a diawi token as DIAWI_TOKEN env variable"
   desc "expects to have a github token as GITHUB_TOKEN env variable"
   desc "expects to have a slack webhook URL as SLACK_URL env variable"
   desc "will fails if file isn't there"
+  desc "---"
+  desc "Output: writes `fastlane/diawi.out` file url of the uploded file"
   lane :upload_diawi do
     upload_to_diawi_and_notify(
+        "android/app/build/outputs/apk/release/app-release.apk"
+    )
+  end
+
+  desc "`fastlane android saucelabs` - upload .apk to sauce labs"
+  desc "also notifies in a GitHub comments and in Slack #jenkins channel"
+  desc "expects to have an .apk prepared: `android/app/build/outputs/apk/release/app-release.apk`"
+  desc "expects to have a saucelabs access key as SAUCE_ACCESS_KEY env variable"
+  desc "expects to have a saucelabs username token as SAUCE_USERNAME env variable"
+  desc "expects to have a saucelabs destination name as SAUCE_LABS_APK env variable"
+  desc "will fails if file isn't there"
+  lane :saucelabs do
+    upload_to_saucelabs(
         "android/app/build/outputs/apk/release/app-release.apk"
     )
   end
